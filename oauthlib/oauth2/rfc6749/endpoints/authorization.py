@@ -54,7 +54,8 @@ class AuthorizationEndpoint(BaseEndpoint):
     unrecognized request parameters.  Request and response parameters
     MUST NOT be included more than once::
 
-        # Enforced through the design of oauthlib.common.Request
+        # Enforced centrally in create_authorization_response() and
+        # validate_authorization_request() for every response type.
 
     .. _`Appendix B`: https://tools.ietf.org/html/rfc6749#appendix-B
     """
@@ -109,6 +110,7 @@ class AuthorizationEndpoint(BaseEndpoint):
         """Extract response_type and route to the designated handler."""
         request = Request(
             uri, http_method=http_method, body=body, headers=headers)
+        self._raise_on_duplicate_params(request, fatal=True)
         request.scopes = scopes
         # TODO: decide whether this should be a required argument
         request.user = None     # TODO: explain this in docs
@@ -128,6 +130,7 @@ class AuthorizationEndpoint(BaseEndpoint):
         """Extract response_type and route to the designated handler."""
         request = Request(
             uri, http_method=http_method, body=body, headers=headers)
+        self._raise_on_duplicate_params(request, fatal=True)
 
         request.scopes = utils.scope_to_list(request.scope)
 

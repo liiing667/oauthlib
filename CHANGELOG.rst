@@ -40,6 +40,18 @@ OAuth2.0 Provider:
   validation when omitted, and implicit grant errors use the query when the
   ``response_mode`` is ``query``, requested or the grant's default, instead
   of always using the fragment.
+* **Breaking**: Duplicate security-sensitive parameters are now rejected by
+  every endpoint through a single check instead of partial, grant-specific
+  lists. The authorization and device-authorization endpoints raise
+  ``InvalidRequestFatalError``; the token (all grants, including refresh and
+  device code), revocation and introspection endpoints return
+  ``invalid_request`` with the standard JSON error body. Covered parameters
+  include ``client_id``, ``client_secret``, ``code``, ``code_verifier``,
+  ``code_challenge``, ``code_challenge_method``, ``device_code``,
+  ``grant_type``, ``password``, ``redirect_uri``, ``refresh_token``,
+  ``response_type``, ``response_mode``, ``scope``, ``state``, ``token``,
+  ``token_type_hint`` and ``username`` (plus ``access_token`` and
+  ``resource``). Unrecognized duplicated parameters continue to be ignored.
 
 Misc:
 * #794: Recommend Authorization Code + PKCE instead of Implicit Grant for public clients.

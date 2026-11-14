@@ -159,10 +159,6 @@ class ResourceOwnerPasswordCredentialsGrant(GrantTypeBase):
                 raise errors.InvalidRequestError(
                     'Request is missing %s parameter.' % param, request=request)
 
-        for param in ('grant_type', 'username', 'password', 'scope'):
-            if param in request.duplicate_params:
-                raise errors.InvalidRequestError(description='Duplicate %s parameter.' % param, request=request)
-
         # This error should rarely (if ever) occur if requests are routed to
         # grant type handlers based on the grant_type parameter.
         if not request.grant_type == 'password':

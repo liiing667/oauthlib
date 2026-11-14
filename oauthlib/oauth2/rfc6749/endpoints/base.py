@@ -9,11 +9,79 @@ import functools
 import logging
 
 from ..errors import (
-    FatalClientError, InvalidClientError, InvalidRequestError, OAuth2Error,
-    ServerError, TemporarilyUnavailableError, UnsupportedTokenTypeError, UnsupportedContentTypeError,
+    FatalClientError, InvalidClientError, InvalidRequestError,
+    InvalidRequestFatalError, OAuth2Error, ServerError,
+    TemporarilyUnavailableError, UnsupportedContentTypeError,
+    UnsupportedTokenTypeError,
 )
 
 log = logging.getLogger(__name__)
+
+#: Security-sensitive request parameters whose presence more than once in a
+#: request (query string or body) must be rejected. RFC 6749 Section 3.1
+#: states that request and response parameters MUST NOT be included more than
+#: once; accepting duplicates lets an attacker smuggle a second value that a
+#: different parser may pick up. Only parameters that influence
+#: authentication, authorization or the issued token are listed here;
+#: unrecognized duplicate parameters continue to be ignored per RFC 6749.
+DUPLICATE_PARAMETERS = frozenset((
+    'access_token',
+    'client_id',
+    'client_secret',
+    'code',
+    'code_challenge',
+    'code_challenge_method',
+    'code_verifier',
+    'device_code',
+    'grant_type',
+    'password',
+    'redirect_uri',
+    'refresh_token',
+    'resource',
+    'response_mode',
+    'response_type',
+    'scope',
+    'state',
+    'token',
+    'token_type_hint',
+    'username',
+))
+
+
+def _raise_on_duplicate_params(request, fatal=False):
+    """Reject requests that carry a security-sensitive parameter twice.
+
+    The check is centralized here so that the authorization, token,
+    revocation, introspection and device endpoints all apply the same rule
+    instead of each grant type maintaining its own partial list.
+
+    :param request: OAuthlib request.
+    :type request: oauthlib.common.Request
+    :param fatal: Authorization endpoint errors must not redirect back to
+        the client, so they raise :class:`FatalClientError` subclasses; the
+        other endpoints return regular token-endpoint errors.
+    :raises InvalidRequestFatalError: when ``fatal`` is True and a
+        duplicated parameter was found.
+    :raises InvalidRequestError: when ``fatal`` is False and a duplicated
+        parameter was found.
+    """
+    try:
+        duplicate_params = request.duplicate_params
+    except ValueError:
+        if fatal:
+            raise InvalidRequestFatalError(
+                description='Unable to parse query string',
+                request=request)
+        raise InvalidRequestError(
+            description='Unable to parse query string', request=request)
+    for param in duplicate_params:
+        if param in DUPLICATE_PARAMETERS:
+            description = 'Duplicate %s parameter.' % param
+            if fatal:
+                raise InvalidRequestFatalError(
+                    description=description, request=request)
+            raise InvalidRequestError(
+                description=description, request=request)
 
 
 class BaseEndpoint:
@@ -87,6 +155,24 @@ class BaseEndpoint:
             if query_params:
                 raise InvalidRequestError(request=request,
                                           description=('URL query parameters are not allowed'))
+
+    def _raise_on_duplicate_params(self, request, fatal=False):
+        """Raise on duplicated security-sensitive parameters.
+
+        :param request: OAuthlib request.
+        :type request: oauthlib.common.Request
+        :param fatal: Use a fatal error (no redirect) on the authorization
+            endpoint; regular invalid_request errors elsewhere.
+        """
+        _raise_on_duplicate_params(request, fatal=fatal)
+
+    def _get_default_headers(self):
+        """Create default headers for token-endpoint error responses."""
+        return {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+            'Pragma': 'no-cache',
+        }
 
     def _raise_on_bad_content_type(self, request, allowed_type):
         """

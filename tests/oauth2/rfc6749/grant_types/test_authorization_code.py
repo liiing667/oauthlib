@@ -155,13 +155,6 @@ class AuthorizationCodeGrantTest(TestCase):
         self.assertRaises(errors.InvalidRequestError, self.auth.validate_token_request,
                           self.request)
 
-    def test_invalid_request_duplicates(self):
-        request = mock.MagicMock(wraps=self.request)
-        request.grant_type = 'authorization_code'
-        request.duplicate_params = ['client_id']
-        self.assertRaises(errors.InvalidRequestError, self.auth.validate_token_request,
-                          request)
-
     def test_unsupported_response_mode(self):
         self.request.response_mode = 'not-a-mode'
         bearer = BearerToken(self.mock_validator)

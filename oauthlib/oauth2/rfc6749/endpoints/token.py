@@ -9,6 +9,7 @@ import logging
 
 from oauthlib.common import Request
 from oauthlib.oauth2.rfc6749 import utils
+from oauthlib.oauth2.rfc6749.errors import OAuth2Error
 
 from .base import BaseEndpoint, catch_errors_and_unavailability
 
@@ -53,7 +54,7 @@ class TokenEndpoint(BaseEndpoint):
     unrecognized request parameters.  Request and response parameters
     MUST NOT be included more than once::
 
-        # Delegated to each grant type.
+        # Enforced centrally in create_token_response() for every grant type.
 
     .. _`Appendix B`: https://tools.ietf.org/html/rfc6749#appendix-B
     """
@@ -90,6 +91,9 @@ class TokenEndpoint(BaseEndpoint):
         request = Request(
             uri, http_method=http_method, body=body, headers=headers)
         self.validate_token_request(request)
+        duplicate_error = self._duplicate_params_error(request)
+        if duplicate_error is not None:
+            return duplicate_error
         # 'scope' is an allowed Token Request param in both the "Resource Owner Password Credentials Grant"
         # and "Client Credentials Grant" flows
         # https://tools.ietf.org/html/rfc6749#section-4.3.2
@@ -121,3 +125,19 @@ class TokenEndpoint(BaseEndpoint):
             request,
             allowed_type='application/x-www-form-urlencoded',
         )
+
+    def _duplicate_params_error(self, request):
+        """Return a standard token error tuple for duplicated params.
+
+        Duplicate-parameter rejection is shared by all grants and runs
+        before grant dispatch, so its error response is produced here with
+        the same headers/body/status shape grant types emit.
+        """
+        try:
+            self._raise_on_duplicate_params(request)
+        except OAuth2Error as e:
+            log.debug('Client error in token request, %s.', e)
+            error_headers = self._get_default_headers()
+            error_headers.update(e.headers)
+            return error_headers, e.json, e.status_code
+        return None

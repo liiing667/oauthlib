@@ -107,6 +107,7 @@ class DeviceAuthorizationEndpoint(BaseEndpoint):
             request,
             allowed_type='application/x-www-form-urlencoded',
         )
+        self._raise_on_duplicate_params(request, fatal=True)
         self.device_code_grant.validate_device_authorization_request(request)
 
     @catch_errors_and_unavailability

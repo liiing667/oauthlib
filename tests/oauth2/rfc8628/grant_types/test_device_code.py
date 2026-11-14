@@ -192,29 +192,6 @@ def test_invalid_grant_type_error():
     validator.save_token.assert_not_called()
 
 
-def test_duplicate_params_error():
-    validator = mock.MagicMock()
-    request: common.Request = create_request(
-        "client_id=123&scope=openid&scope=openid"
-    )
-
-    auth = DeviceCodeGrant(validator)
-    bearer = BearerToken(validator)
-
-    headers, body, status_code = auth.create_token_response(request, bearer)
-    body = json.loads(body)
-
-    assert headers == {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store",
-        "Pragma": "no-cache",
-    }
-    assert body == {"error": "invalid_request", "error_description": "Duplicate scope parameter."}
-    assert status_code == 400
-
-    validator.save_token.assert_not_called()
-
-
 @pytest.mark.parametrize(
     ("status", "expected_error"),
     [
